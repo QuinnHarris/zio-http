@@ -121,6 +121,21 @@ final case class Path private[http] (flags: Path.Flags, segments: Chunk[String])
     else copy(flags = Flag.TrailingSlash.remove(flags))
 
   /**
+   * Disables encoding of path segments in encodeBuilder.
+   */
+  def disableEncoding: Path =
+    if (Flag.DisableEncoding.check(flags)) self
+    else copy(flags = Flag.DisableEncoding.add(flags))
+
+  /**
+   * Enables encoding of path segments in encodeBuilder.
+   */
+  def enableEncoding: Path =
+    if (!Flag.DisableEncoding.check(flags)) self
+    else copy(flags = Flag.DisableEncoding.remove(flags))
+
+
+  /**
    * Encodes the current path into a valid string.
    */
   def encode: String =
@@ -134,7 +149,8 @@ final case class Path private[http] (flags: Path.Flags, segments: Chunk[String])
     var idx     = 0
     val lastIdx = segments.length - 1
     while (idx <= lastIdx) {
-      QueryParamEncoding.encodeComponentInto(segments(idx), Charsets.Http, sb, "%20")
+      if (Flag.DisableEncoding.check(flags)) sb.append(segments(idx))
+      else QueryParamEncoding.encodeComponentInto(segments(idx), Charsets.Http, sb, "%20")
       if (hasTrailingSlash || idx != lastIdx) sb.append('/')
       idx += 1
     }
@@ -161,6 +177,11 @@ final case class Path private[http] (flags: Path.Flags, segments: Chunk[String])
    * Checks if the path contains a trailing slash.
    */
   def hasTrailingSlash: Boolean = Flag.TrailingSlash.check(flags)
+
+  /**
+   * Checks if encoding is disabled for path segments.
+   */
+  def hasDisableEncoding: Boolean = Flag.DisableEncoding.check(flags)
 
   override def hashCode: Int = {
     val normalized = normalize
@@ -420,6 +441,16 @@ object Path {
 
       def unapply(path: Path): Option[Path] =
         if (path.hasTrailingSlash) Some(path.dropTrailingSlash) else None
+    }
+    case object DisableEncoding extends Flag {
+      private[http] final val shift      = 2
+      private[http] final val mask       = 1 << shift
+      private[http] final val invertMask = ~mask
+
+      def apply(path: Path): Path = path.disableEncoding
+
+      def unapply(path: Path): Option[Path] =
+        if (path.hasDisableEncoding) Some(path.enableEncoding) else None
     }
   }
 }

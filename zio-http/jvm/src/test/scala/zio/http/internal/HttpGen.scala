@@ -28,33 +28,34 @@ import zio.http.URL.Location
 import zio.http._
 
 object HttpGen {
-  def anyPath: Gen[Any, Path] = for {
+  def pathGen(minSegments: Int, segmentGen: Gen[Any, String]) = for {
     flags    <- Gen.boolean.zip(Gen.boolean).map { case (left, right) =>
       var flags = 0
       if (left) flags = Path.Flag.LeadingSlash.add(flags)
       if (right) flags = Path.Flag.TrailingSlash.add(flags)
       flags
     }
-    segments <- Gen.listOfBounded(0, 5)(
-      Gen.oneOf(
-        Gen.alphaNumericStringBounded(0, 5),
-      ),
+    segments <- Gen.listOfBounded(minSegments, 5)(
+      Gen.oneOf(segmentGen),
     )
   } yield Path(flags, Chunk.fromIterable(segments))
 
-  def nonEmptyPath: Gen[Any, Path] = for {
-    flags    <- Gen.boolean.zip(Gen.boolean).map { case (left, right) =>
-      var flags = 0
-      if (left) flags = Path.Flag.LeadingSlash.add(flags)
-      if (right) flags = Path.Flag.TrailingSlash.add(flags)
-      flags
-    }
-    segments <- Gen.listOfBounded(1, 5)(
+  def anyPath: Gen[Any, Path]                 = pathGen(0, Gen.alphaNumericStringBounded(0, 5))
+  def nonEmptyPath: Gen[Any, Path]            = pathGen(1, Gen.alphaNumericStringBounded(0, 5))
+  def nonEmptyPathNonURIPath: Gen[Any, Path] = pathGen(
+    1,
+    Gen.stringBounded(1, 5)(
+      // Exclude - . _ ~
       Gen.oneOf(
-        Gen.alphaNumericStringBounded(0, 5),
+        Gen.char('\u0021', '\u002C'), // !"#$%&'()*+,
+        Gen.char('\u002F', '\u002F'), // /
+        Gen.char('\u003A', '\u0040'), // :;<=>?@
+        Gen.char('\u005B', '\u005E'), // [\]^_
+        Gen.char('\u0060', '\u0060'), // `
+        Gen.char('\u007B', '\u007D'), // {|}
       ),
-    )
-  } yield Path(flags, Chunk.fromIterable(segments))
+    ),
+  )
 
   def clientParamsForFileBody(): Gen[Any, Request] = {
     for {

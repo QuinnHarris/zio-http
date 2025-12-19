@@ -414,6 +414,22 @@ object PathSpec extends ZIOHttpSpec with ExitAssertion {
         }
       },
     ),
+    suite("disableEncoding")(
+      test("never encodes") {
+        check(HttpGen.anyPath) { path =>
+          val actual = path.disableEncoding.flags
+          assertTrue(Path.Flag.DisableEncoding.check(actual) == true)
+        }
+      },
+    ),
+    suite("enableEncoding")(
+      test("always encodes") {
+        check(HttpGen.anyPath) { path =>
+          val actual = path.enableEncoding.flags
+          assertTrue(Path.Flag.DisableEncoding.check(actual) == false)
+        }
+      },
+    ),
     suite("removeDotSegments")(
       test("only leading slash and dots") {
         val path     = Path.decode("/./../")
@@ -463,6 +479,15 @@ object PathSpec extends ZIOHttpSpec with ExitAssertion {
         val expected = Path.decode("/start/path/end/")
 
         assertTrue(result == expected)
+      },
+    ),
+    suite("disableEncoding")(
+      test("does not alter the path") {
+        check(HttpGen.nonEmptyPathNonURIPath) { path =>
+          println(s"PATH: ${path} ${URL(path = path).encode != path.encode}")
+          assertTrue(URL(path = path).encode != path.encode) &&
+          assertTrue(URL(path = path.disableEncoding).encode == path.encode)
+        }
       },
     ),
   )
